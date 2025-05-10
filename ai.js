@@ -11,7 +11,13 @@ async function checkMessage(content) {
         messages: [
           {
             role: 'user',
-            content: `Is this message inappropriate for Discord? Reply only with "safe" or "unsafe": "${content}"`
+            content: `
+You are a Discord content moderation engine. You are strict, but only flag messages that clearly contain harmful, abusive, violent, sexually explicit, predatory, or extremely inappropriate content. Ignore slang, jokes, sarcasm, and mild emotional language.
+
+Your response must be exactly one word: "safe" or "unsafe".
+
+Message: "${content}"
+`
           }
         ]
       },
