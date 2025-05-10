@@ -3,7 +3,7 @@ const { Client, GatewayIntentBits } = require('discord.js');
 const { checkMessage } = require('./ai');
 const { supabase } = require('./supabase');
 
-// 📊 Live stats (will be synced on startup)
+// 📊 Live stats (persisted from Supabase on startup)
 let totalMessagesScanned = 0;
 let totalFlaggedMessages = 0;
 const flaggedUsers = new Set();
@@ -58,17 +58,25 @@ client.on('messageCreate', async message => {
   // 🔍 AI moderation
   totalMessagesScanned++;
 
-  // ✅ Always update scanned count
-  const { error: scanUpdateError } = await supabase
+  // ✅ Only update scanned if local value is higher
+  const { data: currentStats, error: fetchError } = await supabase
     .from('modari_stats')
-    .update({
-      scanned: totalMessagesScanned,
-      timestamp: new Date().toISOString()
-    })
-    .eq('id', 1);
+    .select('scanned')
+    .eq('id', 1)
+    .single();
 
-  if (scanUpdateError) {
-    console.error("❌ Failed to update scanned count:", scanUpdateError);
+  if (!fetchError && totalMessagesScanned > currentStats.scanned) {
+    const { error: scanUpdateError } = await supabase
+      .from('modari_stats')
+      .update({
+        scanned: totalMessagesScanned,
+        timestamp: new Date().toISOString()
+      })
+      .eq('id', 1);
+
+    if (scanUpdateError) {
+      console.error("❌ Failed to update scanned count:", scanUpdateError);
+    }
   }
 
   const result = await checkMessage(content);
@@ -95,14 +103,22 @@ client.on('messageCreate', async message => {
       console.log("✅ Flagged message logged to Supabase.");
     }
 
-    // ✅ Update flagged count only when flagged
-    const { error: updateError } = await supabase.from('modari_stats').update({
-      flagged: totalFlaggedMessages,
-      timestamp: new Date().toISOString()
-    }).eq('id', 1);
+    // ✅ Only update flagged if local value is higher
+    const { data: currentFlagStats, error: fetchFlagError } = await supabase
+      .from('modari_stats')
+      .select('flagged')
+      .eq('id', 1)
+      .single();
 
-    if (updateError) {
-      console.error("❌ Failed to update flagged count:", updateError);
+    if (!fetchFlagError && totalFlaggedMessages > currentFlagStats.flagged) {
+      const { error: updateError } = await supabase.from('modari_stats').update({
+        flagged: totalFlaggedMessages,
+        timestamp: new Date().toISOString()
+      }).eq('id', 1);
+
+      if (updateError) {
+        console.error("❌ Failed to update flagged count:", updateError);
+      }
     }
 
     console.log(`[AI-FLAGGED] ${message.author.tag}: ${content}`);
