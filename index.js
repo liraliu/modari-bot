@@ -3,7 +3,7 @@ const { Client, GatewayIntentBits } = require('discord.js');
 const { checkMessage } = require('./ai');
 const { supabase } = require('./supabase');
 
-// 📊 Live stats
+// 📊 Live stats (will be synced on startup)
 let totalMessagesScanned = 0;
 let totalFlaggedMessages = 0;
 const flaggedUsers = new Set();
@@ -17,9 +17,24 @@ const client = new Client({
   ],
 });
 
-// ✅ When bot is ready
-client.once('ready', () => {
+// ✅ On bot startup
+client.once('ready', async () => {
   console.log(`🚨 Modari AI is online as ${client.user.tag}`);
+
+  // 🔁 Sync stats from Supabase
+  const { data, error } = await supabase
+    .from('modari_stats')
+    .select('scanned, flagged')
+    .eq('id', 1)
+    .single();
+
+  if (error) {
+    console.error("❌ Failed to fetch stats from Supabase:", error);
+  } else {
+    totalMessagesScanned = data.scanned || 0;
+    totalFlaggedMessages = data.flagged || 0;
+    console.log(`🔁 Loaded stats: ${totalMessagesScanned} scanned, ${totalFlaggedMessages} flagged`);
+  }
 });
 
 // 🧠 Handle messages
@@ -40,7 +55,7 @@ client.on('messageCreate', async message => {
     return;
   }
 
-  // 🔍 AI-based moderation
+  // 🔍 AI moderation
   totalMessagesScanned++;
 
   // ✅ Always update scanned count
