@@ -43,6 +43,19 @@ client.on('messageCreate', async message => {
   // 🔍 AI-based moderation
   totalMessagesScanned++;
 
+  // ✅ Always update scanned count
+  const { error: scanUpdateError } = await supabase
+    .from('modari_stats')
+    .update({
+      scanned: totalMessagesScanned,
+      timestamp: new Date().toISOString()
+    })
+    .eq('id', 1);
+
+  if (scanUpdateError) {
+    console.error("❌ Failed to update scanned count:", scanUpdateError);
+  }
+
   const result = await checkMessage(content);
 
   if (result.toLowerCase() === "unsafe") {
@@ -67,18 +80,17 @@ client.on('messageCreate', async message => {
       console.log("✅ Flagged message logged to Supabase.");
     }
 
+    // ✅ Update flagged count only when flagged
+    const { error: updateError } = await supabase.from('modari_stats').update({
+      flagged: totalFlaggedMessages,
+      timestamp: new Date().toISOString()
+    }).eq('id', 1);
+
+    if (updateError) {
+      console.error("❌ Failed to update flagged count:", updateError);
+    }
+
     console.log(`[AI-FLAGGED] ${message.author.tag}: ${content}`);
-  }
-
-  // 📈 Real-time stat update
-  const { error: updateError } = await supabase.from('modari_stats').update({
-    scanned: totalMessagesScanned,
-    flagged: totalFlaggedMessages,
-    timestamp: new Date().toISOString()
-  }).eq('id', 1);
-
-  if (updateError) {
-    console.error("❌ Failed to update stats:", updateError);
   }
 });
 
